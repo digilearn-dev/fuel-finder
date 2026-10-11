@@ -28,6 +28,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      - name: Runner location (debug)
+        run: curl -s https://ipinfo.io/json | grep -E '"(ip|country|org)"' || true
       - name: Fetch prices and build site
         run: node scripts/refresh.mjs
         env:

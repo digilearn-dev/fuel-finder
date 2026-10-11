@@ -28,7 +28,10 @@ async function getToken() {
     body: JSON.stringify({ client_id: FF_CLIENT_ID, client_secret: FF_CLIENT_SECRET }),
   });
   if (res.status === 429) throw new Error("Token endpoint rate limited (bad credentials lock out for 5 min)");
-  if (!res.ok) throw new Error(`Token endpoint returned ${res.status}`);
+  if (!res.ok) {
+    const text = (await res.text()).slice(0, 300).replace(/\s+/g, " ");
+    throw new Error(`Token endpoint returned ${res.status} (${res.headers.get("content-type")}): ${text}`);
+  }
   const body = await res.json();
   const token = (body.data || body).access_token;
   if (!token) throw new Error("No access_token in token response");
