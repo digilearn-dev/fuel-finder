@@ -16,6 +16,8 @@ const OUT = `${ROOT}dist`;
 const BASE_URL = process.env.FF_BASE_URL || "https://www.fuel-finder.service.gov.uk";
 const MAX_BATCHES = 100;
 const TILE = { lat: 0.25, lng: 0.4 }; // degrees; the page reads this from meta.json
+// The API refuses requests without a User-Agent
+const UA = "fuel-finder/1.0 (+https://github.com/digilearn-dev/fuel-finder)";
 
 // ---------- Fuel Finder API ----------
 
@@ -24,7 +26,7 @@ async function getToken() {
   if (!FF_CLIENT_ID || !FF_CLIENT_SECRET) throw new Error("FF_CLIENT_ID and FF_CLIENT_SECRET must be set");
   const res = await fetch(`${BASE_URL}/api/v1/oauth/generate_access_token`, {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: { "content-type": "application/json", accept: "application/json", "user-agent": UA },
     body: JSON.stringify({ client_id: FF_CLIENT_ID, client_secret: FF_CLIENT_SECRET }),
   });
   if (res.status === 429) throw new Error("Token endpoint rate limited (bad credentials lock out for 5 min)");
@@ -42,7 +44,7 @@ async function fetchBatched(token, path) {
   const out = [];
   for (let batch = 1; batch <= MAX_BATCHES; batch++) {
     const res = await fetch(`${BASE_URL}${path}?batch-number=${batch}`, {
-      headers: { Authorization: `Bearer ${token}`, accept: "application/json" },
+      headers: { Authorization: `Bearer ${token}`, accept: "application/json", "user-agent": UA },
     });
     if (res.status === 404 && batch > 1) break; // API 404s past the last batch
     if (!res.ok) throw new Error(`${path} batch ${batch} returned ${res.status}`);
