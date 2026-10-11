@@ -1,0 +1,40 @@
+name: Refresh prices
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *" # every 15 min (off the hour, when GitHub is busiest)
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Fetch prices and build site
+        run: node scripts/refresh.mjs
+        env:
+          FF_CLIENT_ID: ${{ secrets.FF_CLIENT_ID }}
+          FF_CLIENT_SECRET: ${{ secrets.FF_CLIENT_SECRET }}
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

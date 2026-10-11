@@ -1,0 +1,10 @@
+{
+  "name": "fuel-finder",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "refresh": "node scripts/refresh.mjs",
+    "sample": "node scripts/refresh.mjs --sample",
+    "serve": "python3 -m http.server 8787 -d dist"
+  }
+}
