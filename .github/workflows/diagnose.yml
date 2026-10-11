@@ -1,0 +1,32 @@
+name: Diagnose API access
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Runner network
+        run: curl -s https://ipinfo.io/json | grep -E '"(ip|city|region|country|org)"' || true
+      - name: Probe Fuel Finder
+        run: |
+          UA="fuel-finder/1.0 (+https://github.com/digilearn-dev/fuel-finder)"
+          probe() {
+            echo "=== $1 $2"
+            curl -sS -o body.txt -D headers.txt -w "status=%{http_code} ip=%{remote_ip}\n" -A "$UA" "${@:3}" -X "$1" "$2" || true
+            grep -iE '^(server|content-type|x-cache|x-amz-cf-pop|x-amzn-|via|x-request-id|retry-after)' headers.txt || true
+            head -c 400 body.txt | tr -s '\n' ' '; echo; echo
+          }
+          probe GET  https://www.fuel-finder.service.gov.uk/
+          probe GET  https://www.developer.fuel-finder.service.gov.uk/
+          probe POST https://www.fuel-finder.service.gov.uk/api/v1/oauth/generate_access_token -H 'content-type: application/json' -d '{"client_id":"x","client_secret":"y"}'
+          probe GET  "https://www.fuel-finder.service.gov.uk/api/v1/pfs?batch-number=1"
+          probe GET  https://www.fuel-finder.service.gov.uk/motorist/price-report

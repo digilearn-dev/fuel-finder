@@ -174,7 +174,7 @@
     if (m < 60) return { t: `${m} min ago`, stale: false };
     if (m < 2880) return { t: `${Math.round(m / 60)} hr ago`, stale: false };
     const d = Math.round(m / 1440);
-    return { t: `${d} days ago`, stale: d > 7 };
+    return { t: `${d} days ago`, stale: d > 14 };
   }
 
   function setFuel(f) {

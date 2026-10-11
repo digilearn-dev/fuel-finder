@@ -16,6 +16,8 @@ const OUT = `${ROOT}dist`;
 const BASE_URL = process.env.FF_BASE_URL || "https://www.fuel-finder.service.gov.uk";
 const MAX_BATCHES = 100;
 const TILE = { lat: 0.25, lng: 0.4 }; // degrees; the page reads this from meta.json
+const MAX_AGE_DAYS = 30;
+const OUTLIER_RANGE = [0.8, 1.4]; // x national median
 // The API refuses requests without a User-Agent
 const UA = "fuel-finder/1.0 (+https://github.com/digilearn-dev/fuel-finder)";
 
@@ -76,6 +78,7 @@ function buildDataset(stationsRaw, pricesRaw) {
       p: {}, // fuel code -> [pence per litre, updated ISO]
     });
   }
+  const oldest = Date.now() - MAX_AGE_DAYS * 86400e3;
   for (const row of pricesRaw) {
     const st = byId.get(row.node_id);
     if (!st) continue;
@@ -83,10 +86,35 @@ function buildDataset(stationsRaw, pricesRaw) {
       const price = Number(fp.price);
       // Ignore obvious bad data (e.g. prices entered in pounds or with a missing digit)
       if (!fp.fuel_type || !Number.isFinite(price) || price < 50 || price > 400) continue;
-      st.p[fp.fuel_type] = [price, fp.price_last_updated || null];
+      // Long-unreported prices are unreliable and would otherwise top the "cheapest" list
+      const updated = Date.parse(fp.price_last_updated);
+      if (!(updated >= oldest)) continue;
+      st.p[fp.fuel_type] = [price, fp.price_last_updated];
     }
   }
+  dropOutliers(byId.values());
   return [...byId.values()].filter((s) => Object.keys(s.p).length > 0);
+}
+
+// Drop prices far from the national median for that fuel — almost always typos or the wrong fuel code.
+function dropOutliers(stations) {
+  const byFuel = {};
+  for (const s of stations) for (const [f, [price]] of Object.entries(s.p)) (byFuel[f] ??= []).push(price);
+  const bounds = {};
+  for (const [f, prices] of Object.entries(byFuel)) {
+    if (prices.length < 20) continue;
+    prices.sort((a, b) => a - b);
+    const median = prices[prices.length >> 1];
+    bounds[f] = [median * OUTLIER_RANGE[0], median * OUTLIER_RANGE[1]];
+  }
+  let dropped = 0;
+  for (const s of stations) {
+    for (const [f, [price]] of Object.entries(s.p)) {
+      const b = bounds[f];
+      if (b && (price < b[0] || price > b[1])) { delete s.p[f]; dropped++; }
+    }
+  }
+  console.log(`Dropped ${dropped} outlier prices`);
 }
 
 // ---------- Sample data ----------
